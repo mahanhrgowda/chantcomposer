@@ -1,2 +1,0 @@
-Contact: mailto:admin@chantcomposer.org
-Encryption: https://chantcomposer.org/pgpkey.asc

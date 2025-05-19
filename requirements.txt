@@ -4,4 +4,5 @@ pydub
 qrcode
 opencv-python-headless
 matplotlib
-pyaudio
+pandas
+altair
