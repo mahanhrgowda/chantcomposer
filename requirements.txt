@@ -1,9 +1,6 @@
-
 streamlit
-numpy
+gtts
+pydub
 matplotlib
-scipy
-pandas
-altair
-opencv-python-headless
-qrcode
+mutagen
+numpy

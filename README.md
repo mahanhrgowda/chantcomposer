@@ -1,11 +1,10 @@
-# Chant Composer WebApp
 
-This is the Bhāva-Driven Sanskrit Chant Composer built with Streamlit.
+# 🕉️ Sanskrit Chant Composer
+
+Deploy this on Streamlit Cloud by selecting `chant_composer_app.py` as your main file.
 
 ## Features
-- Bhāva waveform visualization
-- QR Code mantra encoding
-- Chakra wheel overlay
 
-## Deployment
-Deploy directly to [Streamlit Cloud](https://streamlit.io/cloud) or fork and customize.
+- Bhāva-based mantra generation
+- Export chant audio, waveform, and subtitles
+- Fully web-based Sanskrit chant creation
