@@ -1,1 +1,6 @@
 streamlit
+numpy
+pydub
+qrcode
+opencv-python-headless
+matplotlib
