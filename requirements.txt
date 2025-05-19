@@ -1,8 +1,9 @@
+
 streamlit
 numpy
-pydub
-qrcode
-opencv-python-headless
 matplotlib
+scipy
 pandas
 altair
+opencv-python-headless
+qrcode
