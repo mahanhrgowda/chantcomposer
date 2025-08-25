@@ -2,7 +2,7 @@ import streamlit as st
 import random
 import re
 import numpy as np
-from scipy.io import wavfile
+import wave
 import matplotlib.pyplot as plt
 import os
 import json
@@ -12,23 +12,23 @@ import glob
 st.set_page_config(page_title="Sanskrit Chant Composer", layout="wide")
 st.title("🕉️ Sanskrit Chant Composer by Bhāva")
 
-# Define bhava-specific word lists based on research
+# Updated bhava-specific word lists based on research
 bhava_words = {
-    "Śāntiḥ (peace)": ['om', 'shanti', 'dyauha', 'antariksha', 'prithivi', 'apah', 'oshadhayah', 'vanaspatayah', 'vishvedevah', 'brahma', 'sarvam', 'shantireva'],
-    "Prema (love)": ['aham', 'prema', 'hare', 'krishna', 'hare', 'rama'],
-    "Vīrya (valor)": ['om', 'veera', 'virya', 'vijay', 'bal', 'hanuman', 'namah'],
+    "Śāntiḥ (peace)": ['om', 'shanti', 'dyauha', 'antariksha', 'prithivi', 'apah', 'oshadhayah', 'vanaspatayah', 'vishvedevah', 'brahma', 'sarvam', 'shantireva', 'saha', 'navavatu', 'nau', 'bhunaktu', 'viryam', 'karavavahai', 'tejasvinavadhitamastu', 'ma', 'vidvishavahai'],
+    "Prema (love)": ['aham', 'prema', 'hare', 'krishna', 'rama'],
+    "Vīrya (valor)": ['om', 'hanuman', 'namah', 'veera', 'virya', 'hum', 'ram', 'shiva', 'lakshmi'],
     "Bhaya (fear)": ['om', 'dum', 'durgayei', 'namaha', 'shante', 'prashante', 'sarva', 'bhaya', 'upasha', 'mani', 'swaha'],
     "Āścarya (wonder)": ['om', 'bhur', 'bhuvah', 'svah', 'tat', 'savitur', 'varenyam', 'bhargo', 'devasya', 'dhimahi', 'dhiyo', 'yo', 'nah', 'prachodayat'],
     "Karunā (compassion)": ['om', 'mani', 'padme', 'hum', 'karuna', 'namah'],
-    "Harṣa (joy)": ['hare', 'krishna', 'hare', 'rama', 'govinda', 'gopala'],
-    "Titikṣā (forbearance)": ['om', 'titiksha', 'namah', 'durga', 'namah', 'shiva', 'namah'],
-    "Dhairya (patience)": ['om', 'dhairya', 'namah', 'jat', 'pahāra', 'dhīraj', 'shanti']
+    "Harṣa (joy)": ['hare', 'krishna', 'rama', 'govinda', 'gopala', 'om', 'marichaye', 'namah', 'adityaya'],
+    "Titikṣā (forbearance)": ['om', 'titiksha', 'namah', 'durga', 'shiva'],
+    "Dhairya (patience)": ['om', 'dhairya', 'namah']
 }
 
-# Function to count syllables (approximate based on vowels)
+# Function to count syllables based on vowels
 def count_syllables(word):
     vowels = 'aeiouāīūṛṝḷḹ'
-    return sum(1 for c in word.lower() if c in vowels)
+    return max(1, sum(1 for c in word.lower() if c in vowels))  # Ensure at least 1 for consonant-only, but rare
 
 # Compose multiple mantras
 def compose_multiple(bhava, count=3, length=5):
@@ -43,10 +43,11 @@ def compose_multiple(bhava, count=3, length=5):
             if current_syl + syl <= length:
                 mantra_words.append(w)
                 current_syl += syl
-            else:
-                # Add a short syllable if needed
-                if length - current_syl == 1:
-                    mantra_words.append('om')
+            if current_syl + syl > length and length - current_syl >= 1:
+                short_words = [wd for wd in words if count_syllables(wd) == 1]
+                if short_words:
+                    mantra_words.append(random.choice(short_words))
+                    current_syl += 1
                 break
         mantras.append(' '.join(mantra_words))
     return mantras
@@ -57,22 +58,22 @@ def scan_text_lines(lines):
     for line in lines:
         syllables = []
         for word in line.split():
-            # Simple syllable splitter for Romanized Sanskrit
-            syls = re.findall(r'[bcdfghjklmnpqrstvwxyzḥśṣñṅṇṁṃ]*[aeiouāīūṛṝḷḹ][bcdfghjklmnpqrstvwxyzḥśṣñṅṇṁṃ]*', word, re.IGNORECASE)
+            # Syllable splitter for Romanized Sanskrit
+            syls = re.findall(r'[bcdfghjklmnpqrstvwxyzḥśṣñṅṇṁṃṉ]*[aeiouāīūṛṝḷḹṉ][bcdfghjklmnpqrstvwxyzḥśṣñṅṇṁṃṉ]*', word, re.IGNORECASE)
             syllables.extend(syls)
         report.append({"syllables": syllables})
     return report
 
-# Get tags for syllable: bhava, chandas (laghu/guru), bt (tone placeholder)
+# Get tags for syllable: bhava_tag (placeholder), chandas (laghu/guru), bt (tone placeholder)
 def get_tags_for_syllable(phonemes):
-    syllable = ''.join(phonemes)  # Since phonemes might be split, but here simple
-    # Determine chandas: guru if long vowel or complex
+    syllable = ''.join(phonemes)
     long_vowels = 'āīūṛḹeiaoau'
-    if any(v in syllable.lower() for v in long_vowels) or len(re.findall(r'[bcdfghjklmnpqrstvwxyzḥśṣñṅṇṁṃ]{2,}', syllable)) > 0:
+    consonant_cluster = re.findall(r'[bcdfghjklmnpqrstvwxyzḥśṣñṅṇṁṃ]{2,}', syllable)
+    if any(v in syllable.lower() for v in long_vowels) or len(consonant_cluster) > 0:
         ck = 'guru'
     else:
         ck = 'laghu'
-    bh = 'bhava_tag'  # Placeholder, can be dynamic
+    bh = 'bhava_tag'
     bt = 'default_bt'
     return bh, ck, bt
 
@@ -100,7 +101,6 @@ class VedicChantProfile:
                 freq = high_freq
                 tone = np.sin(freq * t * 2 * np.pi)
             elif self.style == "svarita":
-                # Glide high to low
                 freqs = np.linspace(high_freq, low_freq, len(t))
                 tone = np.sin(2 * np.pi * np.cumsum(freqs / fs))
             elif self.style == "zigzag":
@@ -124,7 +124,14 @@ class VedicChantProfile:
             current_ms += ms_per_syl
         
         path = f"{filename_prefix}_{self.style}.{self.export_format}"
-        wavfile.write(path, fs, full_audio.astype(np.float32))
+        
+        # Write using wave instead of scipy
+        audio_int = (full_audio * 32767).astype(np.int16)
+        with wave.open(path, 'wb') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(fs)
+            wf.writeframes(audio_int.tobytes())
         
         # Save timestamps
         os.makedirs("chant_exports", exist_ok=True)
@@ -137,33 +144,37 @@ class VedicChantProfile:
 # Export bhava waveform
 def export_bhava_waveform(chant_data, filename):
     x = range(len(chant_data))
-    # Map bhava to a value for y
-    bhava_map = {bh: i for i, bh in enumerate(bhava_words.keys())}
-    y = [bhava_map.get(d['bhava'], 0) + random.uniform(-0.5, 0.5) for d in chant_data]
-    fig, ax = plt.subplots()
-    ax.plot(x, y, color='blue')
+    bhava_map = {bh: i * 2 for i, bh in enumerate(bhava_words.keys())}
+    y = [bhava_map.get(d['bhava'], 0) + random.uniform(-1, 1) for d in chant_data]
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.plot(x, y, color='blue', marker='o')
     ax.set_title("Bhāva Waveform")
     ax.set_xlabel("Syllable Index")
-    ax.set_ylabel("Bhāva Intensity")
+    ax.set_ylabel("Bhāva Intensity (Arbitrary Units)")
+    plt.tight_layout()
     plt.savefig(filename)
     plt.close(fig)
 
-# Export animated waveform (static placeholder due to limitations)
+# Export animated waveform (static placeholder)
 def export_animated_waveform(data, filename):
-    # For now, create a static plot as placeholder
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(10, 4))
     if isinstance(data, list) and data and "start_ms" in data[0]:
         x = [t['start_ms'] / 1000 for t in data]
         y = [t['index'] + random.uniform(-1, 1) for t in data]
+        title = "Scrolling Waveform (Static Placeholder)"
     else:
         x = range(len(data))
-        y = [ord(d['bhava'][0]) % 10 for d in data]
-    ax.plot(x, y, color='green')
-    ax.set_title("Animated Waveform (Static Placeholder)")
+        y = [ord(d['bhava'][0]) % 10 + random.uniform(-1, 1) for d in data]
+        title = "Animated Waveform (Static Placeholder)"
+    ax.plot(x, y, color='green', marker='o')
+    ax.set_title(title)
+    ax.set_xlabel("Time (seconds)" if "start_ms" in data[0] else "Syllable Index")
+    ax.set_ylabel("Amplitude")
+    plt.tight_layout()
     static_filename = filename.replace('.mp4', '.png')
     plt.savefig(static_filename)
     plt.close(fig)
-    # Write placeholder for video
+    # Placeholder for video
     with open(filename, 'w') as f:
         f.write("Placeholder video file - see static PNG for waveform.")
 
@@ -171,7 +182,7 @@ def export_animated_waveform(data, filename):
 st.sidebar.header("🎛️ Chant Settings")
 bhava = st.sidebar.selectbox("Choose Bhāva (Emotion)", list(bhava_words.keys()))
 count = st.sidebar.slider("Number of Mantras", 1, 10, 3)
-length = st.sidebar.slider("Syllables per Mantra", 3, 10, 5)
+length = st.sidebar.slider("Syllables per Mantra", 3, 20, 5)
 chant_style = st.sidebar.selectbox("Chant Style", ["default", "udatta", "svarita", "zigzag"])
 export_audio = st.sidebar.checkbox("Export Audio (WAV)", value=True)
 export_waveform = st.sidebar.checkbox("Export Bhāva Waveform Chart")
@@ -191,11 +202,11 @@ if st.button("🪔 Compose Mantras"):
         chant_data = []
         for line in report:
             for s in line["syllables"]:
-                phonemes = [s]  # Simple, no + split
+                phonemes = [s]  # Simple
                 bh_tag, ck, bt = get_tags_for_syllable(phonemes)
-                chant_data.append({"syllable": s, "bhava": bhava})  # Use selected bhava
+                chant_data.append({"syllable": s, "bhava": bhava})
         
-        base_name = f"chant_{bhava.replace(' ', '_').replace('(', '').replace(')', '')}"
+        base_name = f"chant_{bhava.replace(' ', '_').replace('(', '').replace(')', '').replace('ḥ', 'h')}"
         
         if export_audio:
             profile = VedicChantProfile(style=chant_style, overlay_meta=True, export_format="wav")
@@ -235,7 +246,7 @@ if st.button("🪔 Compose Mantras"):
                 # Export scrolling animation
                 scwave_path = f"{base_name}_scroll.mp4"
                 export_animated_waveform(timestamps, filename=scwave_path)
-                st.image(scwave_path.replace('.mp4', '.png'), caption="Scrolling Waveform (Static)")
+                st.image(scwave_path.replace('.mp4', '.png'), caption="Scrolling Waveform (Static Placeholder)")
         
         if export_waveform:
             wpath = f"{base_name}_waveform.png"
@@ -245,7 +256,7 @@ if st.button("🪔 Compose Mantras"):
         if export_animation:
             apath = f"{base_name}_animated.mp4"
             export_animated_waveform(chant_data, filename=apath)
-            st.image(apath.replace('.mp4', '.png'), caption="Animated Waveform (Static)")
+            st.image(apath.replace('.mp4', '.png'), caption="Animated Waveform (Static Placeholder)")
     
     except Exception as e:
         st.error(f"An error occurred: {e}")
