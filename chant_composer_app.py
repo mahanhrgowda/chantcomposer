@@ -28,11 +28,11 @@ bhava_words = {
 # Function to count syllables based on vowels
 def count_syllables(word):
     vowels = 'aeiouāīūṛṝḷḹ'
-    return max(1, sum(1 for c in word.lower() if c in vowels))  # Ensure at least 1 for consonant-only, but rare
+    return max(1, sum(1 for c in word.lower() if c in vowels))  # Ensure at least 1
 
 # Compose multiple mantras
 def compose_multiple(bhava, count=3, length=5):
-    words = bhava_words.get(bhava, ['om', 'namah', 'shivaya'])  # Fallback
+    words = bhava_words.get(bhava, ['om', 'namah', 'shivaya'])
     mantras = []
     for _ in range(count):
         mantra_words = []
@@ -58,13 +58,12 @@ def scan_text_lines(lines):
     for line in lines:
         syllables = []
         for word in line.split():
-            # Syllable splitter for Romanized Sanskrit
             syls = re.findall(r'[bcdfghjklmnpqrstvwxyzḥśṣñṅṇṁṃṉ]*[aeiouāīūṛṝḷḹṉ][bcdfghjklmnpqrstvwxyzḥśṣñṅṇṁṃṉ]*', word, re.IGNORECASE)
             syllables.extend(syls)
         report.append({"syllables": syllables})
     return report
 
-# Get tags for syllable: bhava_tag (placeholder), chandas (laghu/guru), bt (tone placeholder)
+# Get tags for syllable
 def get_tags_for_syllable(phonemes):
     syllable = ''.join(phonemes)
     long_vowels = 'āīūṛḹeiaoau'
@@ -77,7 +76,7 @@ def get_tags_for_syllable(phonemes):
     bt = 'default_bt'
     return bh, ck, bt
 
-# Vedic Chant Profile class
+# Vedic Chant Profile class with improved audio generation
 class VedicChantProfile:
     def __init__(self, style="default", overlay_meta=True, export_format="wav"):
         self.style = style
@@ -87,7 +86,7 @@ class VedicChantProfile:
     def chant_and_export(self, chant_data, filename_prefix):
         fs = 44100  # Sample rate
         duration = 0.5  # Duration per syllable in seconds
-        low_freq, med_freq, high_freq = 220, 440, 660
+        low_freq, med_freq, high_freq = 100, 150, 200  # Lower frequencies for more chant-like pitch (F0)
 
         full_audio = np.array([])
         timestamps = []
@@ -98,17 +97,26 @@ class VedicChantProfile:
             t = np.linspace(0, duration, int(fs * duration), False)
             
             if self.style == "udatta":
-                freq = high_freq
-                tone = np.sin(freq * t * 2 * np.pi)
+                f0 = high_freq
+                phase = f0 * t * 2 * np.pi
+                tone = np.sign(np.sin(phase))  # Square wave for buzzier, voice-like sound
             elif self.style == "svarita":
-                freqs = np.linspace(high_freq, low_freq, len(t))
-                tone = np.sin(2 * np.pi * np.cumsum(freqs / fs))
+                f0s = np.linspace(high_freq, low_freq, len(t))
+                phase = 2 * np.pi * np.cumsum(f0s / fs)
+                tone = np.sign(np.sin(phase))
             elif self.style == "zigzag":
-                freq = high_freq if idx % 2 == 0 else low_freq
-                tone = np.sin(freq * t * 2 * np.pi)
+                f0 = high_freq if idx % 2 == 0 else low_freq
+                phase = f0 * t * 2 * np.pi
+                tone = np.sign(np.sin(phase))
             else:  # default
-                freq = med_freq
-                tone = np.sin(freq * t * 2 * np.pi)
+                f0 = med_freq
+                phase = f0 * t * 2 * np.pi
+                tone = np.sign(np.sin(phase))
+            
+            # Apply simple envelope for less abrupt sound
+            envelope = np.linspace(0, 1, len(t)//10)  # Fade in
+            envelope = np.concatenate((envelope, np.ones(len(t) - 2*len(envelope)), envelope[::-1]))  # Flat then fade out
+            tone *= envelope
             
             # Normalize
             tone = tone * 0.5 / np.max(np.abs(tone))
@@ -125,7 +133,7 @@ class VedicChantProfile:
         
         path = f"{filename_prefix}_{self.style}.{self.export_format}"
         
-        # Write using wave instead of scipy
+        # Write using wave
         audio_int = (full_audio * 32767).astype(np.int16)
         with wave.open(path, 'wb') as wf:
             wf.setnchannels(1)
@@ -202,7 +210,7 @@ if st.button("🪔 Compose Mantras"):
         chant_data = []
         for line in report:
             for s in line["syllables"]:
-                phonemes = [s]  # Simple
+                phonemes = [s]
                 bh_tag, ck, bt = get_tags_for_syllable(phonemes)
                 chant_data.append({"syllable": s, "bhava": bhava})
         
@@ -211,7 +219,7 @@ if st.button("🪔 Compose Mantras"):
         if export_audio:
             profile = VedicChantProfile(style=chant_style, overlay_meta=True, export_format="wav")
             path = profile.chant_and_export(chant_data, filename_prefix=base_name)
-            st.success("Chant audio saved")
+            st.success("Chant audio saved. Note: The audio is synthetic and now uses a buzzier waveform to simulate voice-like chanting instead of pure beeps.")
             st.audio(path)
             
             # Load timestamps
